@@ -13,26 +13,7 @@
 
 ---
 
-## 一、模块划分
-
-`main.py` 只保留 AstrBot 的 handler 定义 —— 带 `@filter` 装饰器的方法必须与插件类处于同一模块，
-AstrBot 是按 `handler_module_path` 给 handler 绑定插件实例的。其余逻辑按功能拆成 mixin：
-
-| 模块 | 职责 |
-| --- | --- |
-| `main.py` | 插件类：三个闸门 handler 与 `gperm` 指令的薄壳（`@filter` 注册必须在这里） |
-| `gate.py` | 判定核心（纯函数，不依赖 AstrBot） |
-| `constants.py` | 共享常量、配置键白名单、日志器 |
-| `plugin_config.py` | 全局配置读取 / 收敛 / 落盘 |
-| `selfcheck.py` | 启动自检与 handler 自愈 |
-| `roles.py` | 发送者身份识别（sender.role → 群对象 → 平台接口） |
-| `enforcement.py` | 拦截判定、兜底闸门逻辑、文案组装与冷却 |
-| `commands.py` | `gperm` 指令的实现 |
-| `page_api.py` | 插件 Pages 的后端 API |
-| `store.py` | 按群配置持久化（平台:群号 键） |
-| `pages/settings/*.js` | 页面脚本（common / global / render / groups / simulate / app 六个 ES module） |
-
-## 二、需求与实现对应
+## 一、需求与实现对应
 
 | 需求 | 实现 |
 | --- | --- |
@@ -41,9 +22,9 @@ AstrBot 是按 `handler_module_path` 给 handler 绑定插件实例的。其余�
 | 对非管理员和群友响应我指定的插件命令 | 模式 `command_only` + `command_whitelist`（默认 `help`、`sid`） |
 | 配置写一个插件页面 | `pages/settings/`（自定义 WebUI 页）+ `_conf_schema.json`（官方配置面板） |
 | 非群主/管理、非白名单的群友，唤醒词也不响应 | 三道闸门：入口拦截 + `OnLLMRequestEvent` 取消请求 + 发送前拦截 |
-| 确认效果是否受加载顺序影响 | 见 [第六节](#六加载顺序会不会影响效果附源码论证) 与 `_tests/test_dispatch_order.py` |
+| 确认效果是否受加载顺序影响 | 见 [第五节](#五加载顺序会不会影响效果附源码论证) 与 `_tests/test_dispatch_order.py` |
 
-## 三、判定流程
+## 二、判定流程
 
 一条群消息进来时：
 
@@ -75,7 +56,7 @@ AstrBot 是按 `handler_module_path` 给 handler 绑定插件实例的。其余�
    按 `group_info_cache_ttl` 缓存，可用 `auto_query_group_info` 关掉。
 4. 全都拿不到时按 `unknown_role_action` 处理，默认 `block`（保持“只有授权的人能对话”）。
 
-## 四、四种模式
+## 三、四种模式
 
 | 模式 | 未授权成员的消息 | 是否中断事件 | 触发 AI |
 | --- | --- | --- | --- |
@@ -90,7 +71,7 @@ AstrBot 是按 `handler_module_path` 给 handler 绑定插件实例的。其余�
 > 「仅放行指定命令」模式下命中的命令**仍然禁止默认 AI**，但指令本身完全正常
 > （插件自己 `yield event.request_llm(...)` 发起的请求也不受影响）。
 
-## 五、三道闸门
+## 四、三道闸门（v1.0.1）
 
 单靠「抢优先级」是不够的：只要有任何一环让入口拦截器没被调用（`plugin_set`、会话级插件禁用、
 插件热重载把注册表清空、别的插件先 `stop_event`），拦截就会静默失效。所以做了三层：
@@ -134,7 +115,7 @@ L3 只在 L1 已明确判定为拦截的事件上生效，并且给「我们自�
 群聊权限门禁：发现自己的拦截器不在 AstrBot 的 handler 注册表里（通常是插件热重载/注册表被清空导致的），已自动补注册。
 ```
 
-## 六、加载顺序会不会影响效果（附源码论证）
+## 五、加载顺序会不会影响效果（附源码论证）
 
 **结论：会，但只影响「优先级相同」的 handler。本插件默认用 `sys.maxsize`，所以正常情况下不受影响；
 即使被绕过，L2 / L3 仍然兜得住。**
@@ -224,7 +205,7 @@ priority 改成 0（等于放弃排队优势）
 - 群里发 `gperm debug`：一次性打印拦截器注册状态、分发位置、`plugin_set`、会话插件禁用状态、
   本群生效配置，以及「你这条消息会被怎么判定」。
 
-## 七、⚠️ 一个反直觉的 AstrBot API
+## 六、⚠️ 一个反直觉的 AstrBot API（踩坑记录）
 
 `event.should_call_llm(x)` 的参数**不是**「要不要调用 LLM」，而是「要不要**禁止**默认 LLM 请求」：
 
@@ -238,9 +219,9 @@ priority 改成 0（等于放弃排队优势）
 （插件照样能装上、日志也不报错，只是 AI 依旧会回复）。本插件已按正确语义调用，
 `_tests/test_plugin.py` 里有对应的回归测试。
 
-## 八、排障清单：明明配了却没拦住
+## 七、排障清单：明明配了却没拦住
 
-> **最常见的原因：`plugin_set`。** AstrBot 的全局配置里有一项 `plugin_set`（WebUI 里是
+> **实测最常见的坑：`plugin_set`。** AstrBot 的全局配置里有一项 `plugin_set`（WebUI 里是
 > 「使用哪些插件」的多选，默认 `["*"]`）。只要它被改成了显式列表，**不在列表里的插件所有
 > handler 都会被跳过**——`WakingCheckStage` 会把 `event.plugins_name` 设成这个列表，
 > `get_handlers_by_event_type(..., plugins_name=...)` 再据此过滤。后果就是
@@ -282,7 +263,7 @@ priority 改成 0（等于放弃排队优势）
 4. **插件页面 →「判定模拟」**：确认配置项本身是对的（角色、模式、白名单）。
 5. **插件页面 →「分发顺序」**：确认本插件排在所有会抢答的 handler 之前。
 
-## 九、安装
+## 八、安装
 
 1. 把整个 `astrbot_plugin_group_permission` 目录放到 AstrBot 的 `data/plugins/` 下
    （或在 WebUI 插件管理里直接上传 zip）。
@@ -294,7 +275,7 @@ priority 改成 0（等于放弃排队优势）
 数据文件：`data/plugin_data/astrbot_plugin_group_permission/group_settings.json`
 （只存「按群覆盖」，全局默认存在 AstrBot 的插件配置里）。写入是「先写临时文件再原子替换」。
 
-## 十、指令
+## 九、指令
 
 群主 / 群管理 / AstrBot 全局管理员可用：
 
@@ -310,7 +291,7 @@ priority 改成 0（等于放弃排队优势）
 | `gperm cmd add 签到` / `gperm cmd del 签到` | 维护命令白名单 |
 | `gperm reset` | 清除本群覆盖，恢复跟随全局 |
 
-## 十一、插件页面
+## 十、插件页面
 
 `pages/settings/`：
 
@@ -323,34 +304,24 @@ priority 改成 0（等于放弃排队优势）
 4. **判定模拟**：填群号/用户/角色/消息，直接看会被判定成什么、会不会发文案。
 5. **分发顺序**：运行时 handler 顺序表（见第五节）。
 
-## 十二、测试
+## 十一、测试
 
 ```bash
 cd astrbot_plugin_group_permission
 python3 _tests/run_all.py                # 全部 96 个用例
 python3 _tests/test_gate.py              # 纯判定逻辑（23）
 python3 _tests/test_plugin.py            # 拦截器集成（28）
-python3 _tests/test_hardening.py         # 自检/自愈 + plugin_set + L2/L3（22）
-python3 _tests/test_page_config.py       # 平台键 + 回复方式 + 成员获取 + 删除（15）
+python3 _tests/test_hardening.py         # 自检/自愈 + L2/L3 + plugin_set + 平台键/回复方式 + 删除（37）
 python3 _tests/test_dispatch_order.py    # 分发顺序实验（8）+ 顺序演示
 ```
 
-`_tests/` 下是一个**最小 AstrBot 桩**，按 AstrBot v4.28.1 的源码复刻了
+`_tests/_fake_astrbot.py` 是一个**最小 AstrBot 桩**：按 AstrBot v4.28.1 的源码复刻了
 `StarHandlerRegistry` 的排序、`call_handler` 的 yield 语义、调度器在 yield 点的 stop 判断、
-`ProcessStage` 的 LLM 判定，以及 `star_handlers_registry` 的注册/自愈路径：
-
-| 文件 | 职责 |
-| --- | --- |
-| `_fake_astrbot.py` | 安装桩到 `sys.modules` + 再导出 |
-| `_stub_core.py` | 核心：`EventType` / `StarHandlerMetadata` / 注册表 / 事件类型过滤器 |
-| `_stub_platform.py` | 平台对象：事件、消息组件、装饰器、`Context`、web 桩 |
-| `_sim_pipeline.py` | 管线仿真与事件工厂（`run_handler_chain` / `make_event`） |
-| `_harness.py` | 测试脚手架（造插件实例、跑闸门、收集输出） |
-
+`ProcessStage` 的 LLM 判定，以及 `star_handlers_registry` 的注册/自愈路径。
 桩不是 AstrBot 本身，关键处都标了源码位置，真实行为请以 AstrBot 源码为准。
 
 
-## 十三、同类实现对比
+## 十二、与 astrbot_plugin_llmallowlist 的对比
 
 参考了 [Akinana22/astrbot_plugin_llmallowlist](https://github.com/Akinana22/astrbot_plugin_llmallowlist)
 （93 行，只做「框架默认 LLM 回复白名单」）。它的核心思路很值得学：**不抢优先级、不 `stop_event()`**，
@@ -382,7 +353,7 @@ python3 _tests/test_dispatch_order.py    # 分发顺序实验（8）+ 顺序演�
 **它的做法更适合的场景**：只想「不让非白名单用户触发 AI 回复」、完全不希望影响其它插件，
 并且不介意「只 @ 一下时可能被内置插件回复」。
 
-## 十四、已知限制
+## 十三、已知限制
 
 - **只想「不影响其它插件」就用 `chat_only` 模式**：其余三种模式会 `stop_event`，
   这意味着本插件之后的所有 handler 都被跳过。
@@ -395,7 +366,7 @@ python3 _tests/test_dispatch_order.py    # 分发顺序实验（8）+ 顺序演�
   这种情况只能改 AstrBot 配置；插件会在启动日志、`gperm debug` 和插件页面里明确报出来，
   并提供一个「一键把本插件加进 plugin_set」的按钮。
 
-## 十五、版本记录
+## 十四、版本记录
 
 | 版本 | 变更 |
 | --- | --- |
@@ -403,4 +374,5 @@ python3 _tests/test_dispatch_order.py    # 分发顺序实验（8）+ 顺序演�
 | v1.0.1 | 新增自检与自愈（handler 从注册表消失时自动补注册并报警）；新增 L2 / L3 兜底闸门（取消未授权成员的 LLM 请求、拦下待发送内容） |
 | v1.0.2 | 修：`plugin_set` 不含本插件时所有 handler 被静默跳过（自检报出 + 页面一键修复）；修：自检重排把自己挤到同优先级内置 handler 之后 |
 | v1.0.3 | 借鉴 astrbot_plugin_llmallowlist：按群配置键改为 `平台:群号`（兼容旧数据）、固定文案支持 `reply_style`（引用 → @ → 普通，失败自动降级）、群成员改用 `get_group_member_list` 快路径 |
-| v1.0.4 | 修：页面添加的群配置无法真正删除（新增「删除记录」与「清理未配置的群记录」，`forget_group` / `prune_seen`）；按功能拆分模块（`main.py` 只留 `@filter` handler，其余拆到 6 个 mixin），页面脚本拆成 6 个 ES module |
+| v1.0.4 | 修：页面添加的群配置无法真正删除（新增「删除记录」与「清理未配置的群记录」，`forget_group` / `prune_seen`）；实现为单文件 `main.py`（handler / 页面接口 / 指令 / 自检同文件，`gate.py`、`store.py` 独立），页面脚本为单文件 `pages/settings/app.js` |
+

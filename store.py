@@ -69,7 +69,8 @@ def resolve_data_dir(plugin_name: str = PLUGIN_NAME) -> Path:
 def make_group_key(platform: str | None, group_id: str | None) -> str:
     """群配置的存储键：``平台名:群号``。
 
-    为什么要带平台：同一个群号在不同平台完全是两回事，白名单需要分开维护。
+    为什么要带平台：同一个群号在不同平台完全是两回事（参考实现
+    astrbot_plugin_llmallowlist 也是按平台分别维护白名单的）。
     不带平台的旧格式数据仍然可用，见 ``GroupStore.get_group``。
     """
     gid = str(group_id or "").strip()

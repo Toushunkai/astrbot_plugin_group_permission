@@ -14,7 +14,6 @@ TESTS = [
     "test_gate.py",
     "test_plugin.py",
     "test_hardening.py",
-    "test_page_config.py",
     "test_dispatch_order.py",
 ]
 
