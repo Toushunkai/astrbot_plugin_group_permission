@@ -1,0 +1,135 @@
+{
+    "enable": {
+        "description": "插件总开关",
+        "type": "bool",
+        "hint": "关闭后本插件完全不介入任何群消息（等于停用），改动会立刻生效，不需要重载插件。",
+        "obvious_hint": true,
+        "default": true
+    },
+    "default_group_enabled": {
+        "description": "默认对所有群启用门禁",
+        "type": "bool",
+        "hint": "新群如果没有在插件页面里单独配置，就按这个开关决定是否启用门禁。关掉它等于「默认不管，只在我点名的群里生效」。",
+        "default": true
+    },
+    "allow_owner_admin": {
+        "description": "放行群主和群管理（单独开关）",
+        "type": "bool",
+        "hint": "开启后群主与群管理可以直接和机器人对话、正常被唤醒。关闭后他们也要靠白名单才放行，否则一样会被拦截。可以在插件页面里按群单独覆盖。",
+        "obvious_hint": true,
+        "default": true
+    },
+    "allow_global_admin": {
+        "description": "始终放行 AstrBot 全局管理员",
+        "type": "bool",
+        "hint": "全局管理员（AstrBot 配置里的 admins_id）默认永远放行，这是防止把自己锁在门外的保险。除非你很清楚后果，否则别关。",
+        "default": true
+    },
+    "mode": {
+        "description": "未授权成员的处理模式",
+        "type": "string",
+        "hint": "chat_only：只禁止未授权成员触发默认 AI 对话（@ 和唤醒词都不会有 AI 回复），其它插件照常工作；command_only：未授权成员只放行「命令白名单」里的指令，其余消息静默忽略；silent：未授权成员的一切消息都静默忽略（连其它插件也不响应）；reply：未授权成员的一切消息都拦截并回复下面的固定文案。",
+        "obvious_hint": true,
+        "options": [
+            "chat_only",
+            "command_only",
+            "silent",
+            "reply"
+        ],
+        "labels": [
+            "仅拦截 AI 对话",
+            "仅放行指定命令",
+            "静默忽略",
+            "回复固定文案"
+        ],
+        "default": "command_only"
+    },
+    "reply": {
+        "description": "固定回复文案（reply 模式 / 拦截提示用）",
+        "type": "text",
+        "hint": "可用占位符：{user} 昵称、{user_id} 用户 ID、{group} 群号、{commands} 命令白名单、{mode} 当前模式名。只有 reply 模式会发送这段话，且有冷却时间避免刷屏。",
+        "default": "{user} 本群开启了对话权限：只有群主、群管理和白名单成员可以和我聊天。\n你可以使用这些指令：{commands}"
+    },
+    "reply_style": {
+        "description": "固定文案的发送方式",
+        "type": "string",
+        "options": [
+            "quote",
+            "at",
+            "plain"
+        ],
+        "labels": [
+            "引用对方那条消息",
+            "@ 对方",
+            "直接发送"
+        ],
+        "hint": "reply 模式 / 拦截提示的发送方式。发送失败会自动降级：引用 → @ → 直接发送（这个三级降级借鉴自 astrbot_plugin_llmallowlist）。",
+        "default": "quote"
+    },
+    "reply_cooldown": {
+        "description": "同一个人重复触发文案的冷却秒数",
+        "type": "int",
+        "hint": "同一个人在冷却时间内再次被拦截，就不再重复发提示（仍然会被拦下，只是不出声），避免刷屏。填 0 表示每次都发。",
+        "default": 60
+    },
+    "command_whitelist": {
+        "description": "命令白名单（未授权成员仍可使用的指令）",
+        "type": "list",
+        "hint": "每行一个命令名，不需要写前缀符号。只有 command_only 模式会用这个列表；命中的命令会正常交给对应插件处理（但仍然不会触发 AI 对话）。填 * 表示放行全部命令。建议保留 help 和 sid：sid 能让群友自己查到 ID 再交给你加白名单。",
+        "default": [
+            "help",
+            "sid"
+        ]
+    },
+    "whitelist": {
+        "description": "全局白名单成员（用户 ID）",
+        "type": "list",
+        "hint": "每行一个用户 ID（纯数字即可，也接受 qq:123 这种写法）。全局白名单对所有群生效；想只对某个群生效，请在插件页面的「按群配置」里填写。",
+        "default": []
+    },
+    "unknown_role_action": {
+        "description": "识别不出群内角色时怎么办",
+        "type": "string",
+        "hint": "block：识别不出来就按未授权处理（更安全，默认）；allow：识别不出来就放行，适合你的适配器拿不到群成员角色的情况。识别来源和结果可以在插件页面的「判定模拟」里查看。",
+        "options": [
+            "block",
+            "allow"
+        ],
+        "labels": [
+            "按未授权处理（推荐）",
+            "直接放行"
+        ],
+        "default": "block"
+    },
+    "auto_query_group_info": {
+        "description": "角色识别不到时调用平台接口查询群成员",
+        "type": "bool",
+        "hint": "OneBot v11（NapCat / Lagrange / go-cqhttp 等）的群消息自带 sender.role，不需要这个开关，插件会直接读取。只有这些信息拿不到时才会调用一次平台接口查群主/群管理列表，并按下面的缓存时间复用结果。",
+        "default": true
+    },
+    "group_info_cache_ttl": {
+        "description": "群成员信息缓存时间（秒）",
+        "type": "int",
+        "hint": "调用一次平台接口拿到的群主/群管理列表会缓存这么久，避免每条消息都请求一次。填 0 表示不缓存。",
+        "default": 300
+    },
+    "group_info_timeout": {
+        "description": "查询群成员信息的超时（秒）",
+        "type": "int",
+        "hint": "超时按「识别失败」处理，走上面的 unknown_role_action 策略。",
+        "default": 8
+    },
+    "priority": {
+        "description": "拦截器优先级（高级，默认最大值）",
+        "type": "int",
+        "hint": "AstrBot 按 priority 从大到小调用 handler，同优先级的按插件加载顺序排列。默认 9223372036854775807（sys.maxsize）保证排在所有 handler（含内置插件）之前，是「唤醒词也不响应」能稳定生效的关键。把它调小，效果就会开始依赖加载顺序和其它插件——插件页面的「分发顺序」页签可以看运行时的真实顺序。",
+        "obvious_hint": true,
+        "default": 9223372036854775807
+    },
+    "enable_log": {
+        "description": "记录拦截日志",
+        "type": "bool",
+        "hint": "开启后每次拦截都会在 AstrBot 日志里写一条（含群号、用户、角色、判定原因），方便排查「为什么没拦住 / 为什么被拦了」。",
+        "default": true
+    }
+}

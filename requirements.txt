@@ -1,0 +1,3 @@
+# 群聊权限门禁不引入任何第三方依赖：
+# 角色识别用平台自带信息（OneBot v11 的 sender.role）或 AstrBot 的 event.get_group()，
+# 配置页与数据持久化只用标准库（json / pathlib）。

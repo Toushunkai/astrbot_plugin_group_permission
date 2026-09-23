@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>群聊权限门禁 · 插件配置</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>正在连接 AstrBot 插件页面…</p>
+    </div>
+
+    <div id="app" class="app" hidden>
+      <header class="hdr">
+        <div class="hdr-main">
+          <div class="logo">权限</div>
+          <div>
+            <h1>群聊权限门禁</h1>
+            <p class="sub">群主 / 群管理（单独开关）+ 白名单成员才能和机器人对话</p>
+          </div>
+        </div>
+        <div class="chips" id="statusChips"></div>
+      </header>
+
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="overview">总览</button>
+        <button class="tab" data-tab="global">全局默认</button>
+        <button class="tab" data-tab="groups">按群配置</button>
+        <button class="tab" data-tab="simulate">判定模拟</button>
+        <button class="tab" data-tab="dispatch">分发顺序</button>
+      </nav>
+
+      <main class="content">
+        <!-- ================================ 总览 ================================ -->
+        <section class="panel active" data-panel="overview">
+          <div id="healthBanner" class="banner" hidden></div>
+          <div class="card">
+            <h2>这套规则怎么运作</h2>
+            <p class="hint">
+              一条群消息进来时，本插件会先判断「发消息的人是谁」：
+              <b>群主 / 群管理</b>（有单独开关）、<b>AstrBot 全局管理员</b>、
+              <b>白名单成员</b> 放行；其余成员按当前群的<b>处理模式</b>处理。
+              未授权成员的 @ 与唤醒词都会被拦下，<b>不会唤起 AI</b>。
+            </p>
+            <div class="kv" id="overviewKv"></div>
+          </div>
+          <div class="card">
+            <h2>四种处理模式</h2>
+            <ul class="list" id="modeList"></ul>
+          </div>
+          <div class="card">
+            <h2>判定动作含义</h2>
+            <div class="kv" id="actionKv"></div>
+          </div>
+        </section>
+
+        <!-- ================================ 全局默认 ================================ -->
+        <section class="panel" data-panel="global">
+          <div class="card">
+            <h2>开关</h2>
+            <p class="hint">没在「按群配置」里单独设置的群，都用这里的默认值。</p>
+            <div class="switches">
+              <label class="switch">
+                <input type="checkbox" data-path="enable" data-type="bool" />
+                <span>插件总开关（关掉后完全不介入任何群消息）</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" data-path="default_group_enabled" data-type="bool" />
+                <span>默认对所有群启用门禁</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" data-path="allow_owner_admin" data-type="bool" />
+                <span>放行群主与群管理（单独开关）</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" data-path="allow_global_admin" data-type="bool" />
+                <span>始终放行 AstrBot 全局管理员（防自锁保险，建议保持开启）</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" data-path="enable_log" data-type="bool" />
+                <span>记录拦截日志（排查「为什么没拦住」用）</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>处理模式与文案</h2>
+            <div class="grid">
+              <label class="field">
+                <span>未授权成员的处理模式</span>
+                <select data-path="mode" data-type="string" id="modeSelect"></select>
+                <small>每个群都可以在「按群配置」里单独覆盖。</small>
+              </label>
+              <label class="field">
+                <span>固定文案的发送方式</span>
+                <select data-path="reply_style" data-type="string">
+                  <option value="quote">引用对方那条消息</option>
+                  <option value="at">@ 对方</option>
+                  <option value="plain">直接发送（不引用也不 @）</option>
+                </select>
+                <small>发送失败会自动降级：引用 → @ → 直接发送。</small>
+              </label>
+              <label class="field">
+                <span>同一个人重复触发文案的冷却（秒）</span>
+                <input type="number" min="0" max="86400" data-path="reply_cooldown" data-type="int" />
+                <small>冷却期内照样拦截，只是不再重复发提示。0 表示每次都发。</small>
+              </label>
+            </div>
+            <label class="field full">
+              <span>固定回复文案（reply 模式用）</span>
+              <textarea class="code" rows="4" spellcheck="false" data-path="reply" data-type="string"></textarea>
+              <small>
+                占位符：<code>{user}</code> 昵称 · <code>{user_id}</code> 用户 ID ·
+                <code>{group}</code> 群号 · <code>{commands}</code> 命令白名单 · <code>{mode}</code> 模式名。
+              </small>
+            </label>
+          </div>
+
+          <div class="card">
+            <h2>白名单</h2>
+            <p class="hint">
+              全局白名单对<b>所有群</b>生效；只想让某个人在某个群免拦截，请到「按群配置」里填。
+              ID 就是 QQ 号一类的用户 ID（纯数字即可），群友可以用 <code>sid</code> 指令自己查。
+            </p>
+            <div class="grid">
+              <label class="field">
+                <span>全局白名单成员（每行一个 ID）</span>
+                <textarea rows="4" data-path="whitelist" data-type="list" placeholder="10001&#10;10002"></textarea>
+              </label>
+              <label class="field">
+                <span>命令白名单（每行一个命令名）</span>
+                <textarea rows="4" data-path="command_whitelist" data-type="list" placeholder="help&#10;sid"></textarea>
+                <small>只有「仅放行指定命令」模式会用；填 <code>*</code> 表示放行全部命令。</small>
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>角色识别（高级）</h2>
+            <p class="hint">
+              OneBot v11 系适配器（NapCat / Lagrange / go-cqhttp 等）的群消息自带 <code>sender.role</code>，
+              插件会直接读，不会额外请求接口。只有拿不到时才会调用平台接口查群主/群管理列表。
+            </p>
+            <div class="switches">
+              <label class="switch">
+                <input type="checkbox" data-path="auto_query_group_info" data-type="bool" />
+                <span>角色识别不到时调用平台接口查询群成员</span>
+              </label>
+            </div>
+            <div class="grid">
+              <label class="field">
+                <span>识别不出角色时</span>
+                <select data-path="unknown_role_action" data-type="string">
+                  <option value="block">按未授权处理（推荐，更安全）</option>
+                  <option value="allow">直接放行</option>
+                </select>
+                <small>如果你的适配器既不给 sender.role，也查不到群成员，就选「直接放行」，否则连群主都会被拦。</small>
+              </label>
+              <label class="field">
+                <span>群成员信息缓存（秒）</span>
+                <input type="number" min="0" max="86400" data-path="group_info_cache_ttl" data-type="int" />
+              </label>
+              <label class="field">
+                <span>查询超时（秒）</span>
+                <input type="number" min="1" max="60" data-path="group_info_timeout" data-type="int" />
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>分发顺序（高级）</h2>
+            <p class="hint">
+              AstrBot 把一条消息能触发的所有 handler 收集起来，<b>按 priority 从大到小</b>依次调用；
+              本插件一旦 <code>stop_event()</code>，后面的 handler 全部跳过。
+              所以「拦得住」的前提是排在前面——默认优先级是 <code>9223372036854775807</code>（sys.maxsize），
+              保证排在内置插件之前。调低它就会开始<strong>受插件加载顺序影响</strong>。
+            </p>
+            <div class="grid">
+              <label class="field">
+                <span>拦截器优先级</span>
+                <input type="number" min="0" data-path="priority" data-type="int" />
+                <small>改完保存立即生效（插件会自动重排自己的位置）。想看当前真实顺序，去「分发顺序」页签。</small>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================ 按群配置 ================================ -->
+        <section class="panel" data-panel="groups">
+          <div class="card">
+            <div class="card-head">
+              <h2>群列表</h2>
+              <button class="btn" id="btnReloadGroups">刷新</button>
+              <button class="btn" id="btnPruneGroups">清理未配置的群记录</button>
+            </div>
+            <p class="hint">
+              这里列出机器人见过的群和已经单独配置过的群。没配置过的群显示「跟随全局」。
+            </p>
+            <div class="legend">
+              <span><b>恢复全局</b>：只清掉本群的单独配置，这一行会留着（因为机器人记得见过这个群）</span>
+              <span><b>删除记录</b>：把这一行连同「见过的群」记录一起删掉</span>
+              <span><b>清理未配置的群记录</b>：一次性删掉所有「没见过也没配置」的行</span>
+            </div>
+            <div class="row">
+              <input id="newGroupPlatform" type="text" list="platformList" placeholder="平台名（可留空），例如 aiocqhttp" />
+              <input id="newGroupId" type="text" inputmode="numeric" placeholder="手动添加群号，例如 123456789" />
+              <button class="btn" id="btnNewGroup">添加配置</button>
+              <datalist id="platformList">
+                <option value="aiocqhttp"></option>
+                <option value="qqofficial"></option>
+                <option value="telegram"></option>
+                <option value="lark"></option>
+                <option value="discord"></option>
+                <option value="kook"></option>
+                <option value="wechat"></option>
+              </datalist>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="groupsTable">
+                <thead>
+                  <tr>
+                    <th>平台</th>
+                    <th>群号</th>
+                    <th>备注 / 群名</th>
+                    <th>启用</th>
+                    <th>模式</th>
+                    <th>群主管理放行</th>
+                    <th>白名单</th>
+                    <th class="right">操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" id="groupEditorCard" hidden>
+            <div class="card-head">
+              <h2>编辑群 <code id="editorGroupId"></code> <span class="muted" id="editorPlatform"></span></h2>
+              <button class="btn" id="btnCloseEditor">关闭</button>
+            </div>
+            <div class="grid">
+              <label class="field">
+                <span>备注 / 群名</span>
+                <input type="text" id="editNote" placeholder="例如：主群" />
+              </label>
+              <label class="field">
+                <span>启用门禁</span>
+                <select id="editEnabled">
+                  <option value="">跟随全局</option>
+                  <option value="true">启用</option>
+                  <option value="false">停用（本群所有人可对话）</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>处理模式</span>
+                <select id="editMode">
+                  <option value="">跟随全局</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>放行群主与群管理</span>
+                <select id="editOwnerAdmin">
+                  <option value="">跟随全局</option>
+                  <option value="true">开</option>
+                  <option value="false">关（群主也要靠白名单）</option>
+                </select>
+              </label>
+            </div>
+            <label class="field full">
+              <span>本群白名单（每行一个 ID，留空表示跟随全局）</span>
+              <textarea rows="4" id="editWhitelist" placeholder="10001&#10;10002"></textarea>
+              <small>只对本群生效。留空 = 用全局白名单。</small>
+            </label>
+            <label class="field full">
+              <span>本群命令白名单（每行一个命令名，留空表示跟随全局）</span>
+              <textarea rows="3" id="editCommands" placeholder="help&#10;sid"></textarea>
+            </label>
+            <label class="field full">
+              <span>本群固定文案（留空表示跟随全局）</span>
+              <textarea class="code" rows="3" id="editReply"></textarea>
+            </label>
+            <div class="row">
+              <button class="btn primary" id="btnSaveGroup">保存本群配置</button>
+              <button class="btn" id="btnResetGroup">恢复跟随全局</button>
+              <span class="muted" id="editorHint"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================ 判定模拟 ================================ -->
+        <section class="panel" data-panel="simulate">
+          <div class="card">
+            <h2>判定模拟</h2>
+            <p class="hint">
+              不真的发消息，直接看某个人在某群发的某条消息会被怎么处理。用来确认配置有没有配对、
+              角色识别在你这套适配器上是否正常。
+            </p>
+            <div class="grid">
+              <label class="field">
+                <span>群号</span>
+                <input type="text" id="simGroup" placeholder="123456789" />
+              </label>
+              <label class="field">
+                <span>发送者 ID</span>
+                <input type="text" id="simUser" placeholder="10001" />
+              </label>
+              <label class="field">
+                <span>发送者在群里的角色</span>
+                <select id="simRole">
+                  <option value="member">普通群员</option>
+                  <option value="admin">群管理</option>
+                  <option value="owner">群主</option>
+                  <option value="">未知</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>是 AstrBot 全局管理员吗</span>
+                <select id="simGlobalAdmin">
+                  <option value="false">否</option>
+                  <option value="true">是</option>
+                </select>
+              </label>
+            </div>
+            <label class="field full">
+              <span>消息内容</span>
+              <input type="text" id="simMessage" placeholder="例如：/help 或 你好呀（唤醒词已被剥离，这里写剥离后的内容即可）" />
+            </label>
+            <div class="row">
+              <button class="btn primary" id="btnSimulate">开始判定</button>
+              <span class="muted" id="simHint"></span>
+            </div>
+            <pre class="result" id="simResult" hidden></pre>
+          </div>
+        </section>
+
+        <!-- ================================ 分发顺序 ================================ -->
+        <section class="panel" data-panel="dispatch">
+          <div class="card">
+            <div class="card-head">
+              <h2>运行时 handler 分发顺序</h2>
+              <button class="btn" id="btnReloadDispatch">重新读取</button>
+            </div>
+            <p class="hint" id="dispatchNote"></p>
+            <div class="legend">
+              <span>这张表就是「会不会受加载顺序影响」的答案：</span>
+              <span>AstrBot 按 <code>priority</code> 从大到小调用；</span>
+              <span><code>priority</code> 相同的，按<b>插件加载顺序</b>（也就是注册顺序）排列；</span>
+              <span>本插件（<b>group_permission</b>）一旦 <code>stop_event()</code>，它<b>下面</b>的行都不会执行。</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="dispatchTable">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>插件</th>
+                    <th>handler</th>
+                    <th>priority</th>
+                    <th>过滤器</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="savebar">
+        <span class="muted" id="saveHint">全局默认改完记得保存</span>
+        <div class="row">
+          <button class="btn" id="btnReset">放弃修改</button>
+          <button class="btn primary" id="btnSave">保存全局默认</button>
+        </div>
+      </footer>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

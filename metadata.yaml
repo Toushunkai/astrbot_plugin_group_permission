@@ -1,0 +1,21 @@
+name: astrbot_plugin_group_permission
+display_name: 群聊权限门禁
+short_desc: 群里只让群主/群管理/白名单成员和机器人对话，其余成员按模式处理
+desc: 群聊权限门禁：可按群开启「只有群主、群管理与白名单成员能和机器人对话」，未授权成员的 @ 与唤醒词同样不会唤起 AI；对非授权成员支持四种处理模式（仅拦截 AI 对话 / 仅放行指定命令 / 静默忽略 / 回复固定文案），并提供 WebUI 插件配置页（按群配置、判定模拟、分发顺序查看）。
+help: https://github.com/Toushunkai/astrbot_plugin_group_permission
+version: v1.0.4
+author: Toushunkai
+repo: https://github.com/Toushunkai/astrbot_plugin_group_permission
+astrbot_version: ">=4.0.0"
+support_platforms:
+  - aiocqhttp
+  - qqofficial
+  - qqofficial_webhook
+  - telegram
+  - lark
+  - dingtalk
+  - discord
+  - slack
+  - kook
+  - wecom
+  - webchat

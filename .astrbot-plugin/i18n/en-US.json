@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "display_name": "Group Permission Gate",
+    "short_desc": "Only the group owner, admins and whitelisted members can talk to the bot",
+    "desc": "Per-group gate that only lets the group owner, group admins (separate toggle) and whitelisted members talk to the bot. Unauthorized members cannot wake the AI even with @ or the wake prefix, and are handled by one of four modes. Ships with a WebUI settings page."
+  },
+  "pages": {
+    "settings": {
+      "title": "Group Permission Gate",
+      "description": "Per-group rules for who may talk to the bot, what happens to everyone else, plus a decision simulator and the live dispatch order.",
+      "subtitle": "Owner/admin toggle · whitelist · four modes · per-group config"
+    }
+  }
+}
